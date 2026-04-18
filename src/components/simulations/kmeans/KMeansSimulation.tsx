@@ -177,8 +177,8 @@ export function KMeansSimulation() {
                       x2={centroid?.x}
                       y2={centroid?.y}
                       stroke={getClusterColor(point.cluster ?? 0)}
-                      strokeOpacity={0.5}
-                      strokeWidth={0.5}
+                      strokeOpacity={0.22}
+                      strokeWidth={0.3}
                       style={{ transition: "all 420ms ease" }}
                     />
                   );
