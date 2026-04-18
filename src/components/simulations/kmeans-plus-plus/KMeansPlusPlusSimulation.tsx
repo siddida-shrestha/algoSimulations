@@ -26,7 +26,7 @@ import type {
   ProbabilityEntry,
   SimulationPhase,
 } from "./types";
-import { pointLabel } from "./utils";
+import { MAX_POINT_COUNT, MIN_POINT_COUNT, pointLabel } from "./utils";
 import { useKMeansPlusPlus } from "./useKMeansPlusPlus";
 
 const CLUSTER_COLORS = ["#0ea5e9", "#f97316", "#10b981", "#e11d48", "#a855f7"];
@@ -190,10 +190,12 @@ export function KMeansPlusPlusSimulation() {
     logs,
     clusterIteration,
     k,
+    pointCount,
     speedMs,
     compareEnabled,
     autoPlay,
     setK,
+    setPointCount,
     setSpeedMs,
     setCompareEnabled,
     startInitialization,
@@ -206,8 +208,8 @@ export function KMeansPlusPlusSimulation() {
 
   return (
     <SimulationLayout
-      title="K-Means++ Initialization + Clustering"
-      description="Step through K-Means++ centroid seeding (D(x)^2 weighted sampling), then run standard K-Means. Compare against random initialization on the same dataset."
+      title="K-Means++ Seeding + K-Means Clustering"
+      description="Walk through D(x)^2-weighted centroid seeding step-by-step, then continue with standard K-Means and compare against random initialization on the same dataset."
       controls={
         <div className="space-y-4">
           <div className="space-y-2">
@@ -227,6 +229,24 @@ export function KMeansPlusPlusSimulation() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Data points</p>
+              <Badge variant="outline">{pointCount}</Badge>
+            </div>
+            <Slider
+              min={MIN_POINT_COUNT}
+              max={MAX_POINT_COUNT}
+              step={10}
+              value={[pointCount]}
+              onValueChange={(value) => {
+                const nextValue = Array.isArray(value) ? value[0] : value;
+                setPointCount(nextValue ?? pointCount);
+              }}
+              aria-label="Data point count"
+            />
           </div>
 
           <div className="space-y-2">

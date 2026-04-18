@@ -7,7 +7,9 @@ import type {
 
 export const MIN_COORD = 8;
 export const MAX_COORD = 92;
-export const DEFAULT_POINT_COUNT = 26;
+export const MIN_POINT_COUNT = 150;
+export const MAX_POINT_COUNT = 500;
+export const DEFAULT_POINT_COUNT = 200;
 export const MIN_CLUSTER_ITERATIONS = 4;
 
 export function euclidean(

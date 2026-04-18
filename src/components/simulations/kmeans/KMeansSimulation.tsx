@@ -18,6 +18,7 @@ import { Slider } from "@/components/ui/slider";
 import { SimulationLayout } from "@/components/simulations/SimulationLayout";
 
 import { useKMeans } from "./useKMeans";
+import { MAX_POINT_COUNT, MIN_POINT_COUNT } from "./utils";
 
 const CLUSTER_COLORS = ["#0ea5e9", "#f97316", "#10b981", "#e11d48", "#a855f7"];
 
@@ -25,8 +26,10 @@ export function KMeansSimulation() {
   const {
     state,
     k,
+    pointCount,
     speedMs,
     setK,
+    setPointCount,
     setSpeedMs,
     step,
     start,
@@ -39,8 +42,8 @@ export function KMeansSimulation() {
 
   return (
     <SimulationLayout
-      title="K-Means Clustering Simulation"
-      description="Observe how K-Means assigns points to the nearest centroid, updates centroid positions, and converges after at least 4 iterations."
+      title="K-Means Clustering"
+      description="Interactive K-Means clustering with adjustable dataset size, step execution, and centroid movement tracking."
       controls={
         <div className="space-y-4">
           <div className="space-y-2">
@@ -60,6 +63,24 @@ export function KMeansSimulation() {
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Data points</p>
+              <Badge variant="outline">{pointCount}</Badge>
+            </div>
+            <Slider
+              min={MIN_POINT_COUNT}
+              max={MAX_POINT_COUNT}
+              step={10}
+              value={[pointCount]}
+              onValueChange={(value) => {
+                const nextValue = Array.isArray(value) ? value[0] : value;
+                setPointCount(nextValue ?? pointCount);
+              }}
+              aria-label="Data point count"
+            />
           </div>
 
           <div className="space-y-2">

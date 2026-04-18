@@ -2,6 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 
 import type { KMeansState, IterationSnapshot } from "./types";
 import {
+  DEFAULT_POINT_COUNT,
+  MAX_POINT_COUNT,
+  MIN_POINT_COUNT,
   assignPointsToCentroids,
   clusterAssignmentsChanged,
   createRandomCentroids,
@@ -21,8 +24,10 @@ interface UseKMeansOptions {
 interface UseKMeansResult {
   state: KMeansState;
   k: number;
+  pointCount: number;
   speedMs: number;
   setK: (nextK: number) => void;
+  setPointCount: (nextPointCount: number) => void;
   setSpeedMs: (nextSpeedMs: number) => void;
   step: () => void;
   start: () => void;
@@ -35,15 +40,21 @@ const CONVERGENCE_THRESHOLD = 0.001;
 
 export function useKMeans({
   initialK = 3,
-  initialPointCount,
+  initialPointCount = DEFAULT_POINT_COUNT,
   initialSpeedMs = 700,
 }: UseKMeansOptions = {}): UseKMeansResult {
+  const normalizedInitialPointCount = Math.min(
+    MAX_POINT_COUNT,
+    Math.max(MIN_POINT_COUNT, initialPointCount),
+  );
+
   const [k, setK] = useState(initialK);
+  const [pointCount, setPointCount] = useState(normalizedInitialPointCount);
   const [speedMs, setSpeedMs] = useState(initialSpeedMs);
 
   const createInitialState = useCallback(
-    (targetK: number): KMeansState => {
-      const points = generateRandomPoints(initialPointCount);
+    (targetK: number, targetPointCount: number): KMeansState => {
+      const points = generateRandomPoints(targetPointCount);
       const centroids = createRandomCentroids(points, targetK);
 
       return {
@@ -61,11 +72,11 @@ export function useKMeans({
         ],
       };
     },
-    [initialPointCount],
+    [],
   );
 
   const [state, setState] = useState<KMeansState>(() =>
-    createInitialState(initialK),
+    createInitialState(initialK, normalizedInitialPointCount),
   );
 
   const step = useCallback(() => {
@@ -120,10 +131,10 @@ export function useKMeans({
   }, []);
 
   const reset = useCallback(
-    (nextK = k) => {
-      setState(createInitialState(nextK));
+    (nextK = k, nextPointCount = pointCount) => {
+      setState(createInitialState(nextK, nextPointCount));
     },
-    [createInitialState, k],
+    [createInitialState, k, pointCount],
   );
 
   useEffect(() => {
@@ -147,16 +158,31 @@ export function useKMeans({
   const updateK = useCallback(
     (nextK: number) => {
       setK(nextK);
-      setState(createInitialState(nextK));
+      setState(createInitialState(nextK, pointCount));
     },
-    [createInitialState],
+    [createInitialState, pointCount],
+  );
+
+  const updatePointCount = useCallback(
+    (nextPointCount: number) => {
+      const boundedPointCount = Math.min(
+        MAX_POINT_COUNT,
+        Math.max(MIN_POINT_COUNT, nextPointCount),
+      );
+
+      setPointCount(boundedPointCount);
+      setState(createInitialState(k, boundedPointCount));
+    },
+    [createInitialState, k],
   );
 
   return {
     state,
     k,
+    pointCount,
     speedMs,
     setK: updateK,
+    setPointCount: updatePointCount,
     setSpeedMs,
     step,
     start,

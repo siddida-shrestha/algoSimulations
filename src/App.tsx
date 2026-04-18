@@ -18,11 +18,11 @@ function SimulationsHome() {
       <header className="space-y-2">
         <Badge variant="secondary">Algorithm Lab</Badge>
         <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-          Simulation Playground
+          Clustering Simulation Playground
         </h1>
         <p className="max-w-3xl text-muted-foreground">
-          Explore interactive algorithm simulations. This structure is designed
-          for easy additions like K-Means++, KNN, and DBSCAN.
+          Explore interactive clustering visualizations with reusable structure
+          for future algorithms like KNN, DBSCAN, and more.
         </p>
       </header>
 
@@ -31,8 +31,8 @@ function SimulationsHome() {
           <CardHeader>
             <CardTitle>K-Means Clustering</CardTitle>
             <CardDescription>
-              Visualize assignment and centroid update steps with iteration
-              tracking.
+              Standard K-Means with controllable dataset size, stepping, and
+              centroid movement logs.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -44,10 +44,10 @@ function SimulationsHome() {
 
         <Card>
           <CardHeader>
-            <CardTitle>K-Means++ Initialization</CardTitle>
+            <CardTitle>K-Means++ Seeding + K-Means</CardTitle>
             <CardDescription>
-              Step-by-step probabilistic centroid seeding with random-vs-K++
-              comparison.
+              Step-by-step D(x)^2 weighted seeding with side-by-side comparison
+              against random initialization.
             </CardDescription>
           </CardHeader>
           <CardContent>

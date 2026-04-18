@@ -10,6 +10,8 @@ import type {
 } from "./types";
 import {
   DEFAULT_POINT_COUNT,
+  MAX_POINT_COUNT,
+  MIN_POINT_COUNT,
   MIN_CLUSTER_ITERATIONS,
   buildProbabilityEntries,
   createCentroidFromPoint,
@@ -38,10 +40,12 @@ interface UseKMeansPlusPlusResult {
   logs: IterationLog[];
   clusterIteration: number;
   k: number;
+  pointCount: number;
   speedMs: number;
   compareEnabled: boolean;
   autoPlay: boolean;
   setK: (value: number) => void;
+  setPointCount: (value: number) => void;
   setSpeedMs: (value: number) => void;
   setCompareEnabled: (enabled: boolean) => void;
   startInitialization: () => void;
@@ -86,14 +90,20 @@ export function useKMeansPlusPlus({
   initialPointCount = DEFAULT_POINT_COUNT,
   initialSpeedMs = 700,
 }: UseKMeansPlusPlusOptions = {}): UseKMeansPlusPlusResult {
+  const normalizedInitialPointCount = Math.min(
+    MAX_POINT_COUNT,
+    Math.max(MIN_POINT_COUNT, initialPointCount),
+  );
+
   const [k, setK] = useState(initialK);
+  const [pointCount, setPointCount] = useState(normalizedInitialPointCount);
   const [speedMs, setSpeedMs] = useState(initialSpeedMs);
   const [compareEnabled, setCompareEnabled] = useState(false);
   const [autoPlay, setAutoPlay] = useState(false);
 
   const initial = useMemo(
-    () => createInitialRun(initialPointCount, initialK),
-    [initialK, initialPointCount],
+    () => createInitialRun(normalizedInitialPointCount, initialK),
+    [initialK, normalizedInitialPointCount],
   );
 
   const [points, setPoints] = useState(initial.points);
@@ -116,7 +126,7 @@ export function useKMeansPlusPlus({
   ]);
 
   const reset = useCallback(() => {
-    const next = createInitialRun(initialPointCount, k);
+    const next = createInitialRun(pointCount, k);
 
     setPoints(next.points);
     setCentroids([]);
@@ -133,13 +143,13 @@ export function useKMeansPlusPlus({
         "Dataset regenerated. Start initialization to pick the first centroid.",
       ),
     ]);
-  }, [initialPointCount, k]);
+  }, [k, pointCount]);
 
   const setKAndReset = useCallback(
     (value: number) => {
       setK(value);
 
-      const next = createInitialRun(initialPointCount, value);
+      const next = createInitialRun(pointCount, value);
       setPoints(next.points);
       setCentroids([]);
       setRandomRun(next.randomRun);
@@ -156,7 +166,36 @@ export function useKMeansPlusPlus({
         ),
       ]);
     },
-    [initialPointCount],
+    [pointCount],
+  );
+
+  const setPointCountAndReset = useCallback(
+    (value: number) => {
+      const boundedPointCount = Math.min(
+        MAX_POINT_COUNT,
+        Math.max(MIN_POINT_COUNT, value),
+      );
+
+      setPointCount(boundedPointCount);
+
+      const next = createInitialRun(boundedPointCount, k);
+      setPoints(next.points);
+      setCentroids([]);
+      setRandomRun(next.randomRun);
+      setPhase("idle");
+      setInitializationStep("pick-first-centroid");
+      setProbabilityEntries([]);
+      setLatestSelectedPointIndex(undefined);
+      setClusterIteration(0);
+      setAutoPlay(false);
+      setLogs([
+        makeLog(
+          "Point Count Updated",
+          `Point count set to ${boundedPointCount}. Dataset reset for both Random and K-Means++ runs.`,
+        ),
+      ]);
+    },
+    [k],
   );
 
   const startInitialization = useCallback(() => {
@@ -369,10 +408,12 @@ export function useKMeansPlusPlus({
     logs,
     clusterIteration,
     k,
+    pointCount,
     speedMs,
     compareEnabled,
     autoPlay,
     setK: setKAndReset,
+    setPointCount: setPointCountAndReset,
     setSpeedMs,
     setCompareEnabled,
     startInitialization,
