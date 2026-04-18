@@ -225,6 +225,8 @@ export function KMeansPlusPlusSimulation() {
     nextStep,
     toggleAutoPlay,
     reset,
+    inertia,
+    dunnIndex,
   } = useKMeansPlusPlus();
 
   const plusPlusConverged = phase === "converged";
@@ -271,7 +273,7 @@ export function KMeansPlusPlusSimulation() {
             </div>
             <Slider
               min={2}
-              max={20}
+              max={Math.min(pointCount, 50)}
               step={1}
               value={[k]}
               onValueChange={(value) => {
@@ -367,6 +369,13 @@ export function KMeansPlusPlusSimulation() {
             <p>
               Cluster iteration:{" "}
               <span className="font-medium">{clusterIteration}</span>
+            </p>
+            <p>
+              Inertia: <span className="font-medium">{inertia.toFixed(2)}</span>
+            </p>
+            <p>
+              Dunn Index:{" "}
+              <span className="font-medium">{dunnIndex.toFixed(3)}</span>
             </p>
             <div className="flex flex-wrap gap-2 pt-1">
               <Badge variant={plusPlusConverged ? "default" : "secondary"}>

@@ -6,6 +6,8 @@ import {
   MAX_POINT_COUNT,
   MIN_POINT_COUNT,
   assignPointsToCentroids,
+  calculateDunnIndex,
+  calculateInertia,
   clusterAssignmentsChanged,
   createRandomCentroids,
   formatCentroid,
@@ -27,6 +29,8 @@ interface UseKMeansResult {
   pointCount: number;
   speedMs: number;
   stepMode: "assign" | "move";
+  inertia: number;
+  dunnIndex: number;
   setK: (nextK: number) => void;
   setPointCount: (nextPointCount: number) => void;
   setSpeedMs: (nextSpeedMs: number) => void;
@@ -178,6 +182,14 @@ export function useKMeans({
     });
   }, [state.centroids]);
 
+  const inertia = useMemo(() => {
+    return calculateInertia(state.points, state.centroids);
+  }, [state.points, state.centroids]);
+
+  const dunnIndex = useMemo(() => {
+    return calculateDunnIndex(state.points, state.centroids);
+  }, [state.points, state.centroids]);
+
   const updateK = useCallback(
     (nextK: number) => {
       const boundedK = Math.min(nextK, pointCount);
@@ -212,6 +224,8 @@ export function useKMeans({
     pointCount,
     speedMs,
     stepMode,
+    inertia,
+    dunnIndex,
     setK: updateK,
     setPointCount: updatePointCount,
     setSpeedMs,

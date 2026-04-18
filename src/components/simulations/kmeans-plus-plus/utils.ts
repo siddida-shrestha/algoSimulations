@@ -228,3 +228,50 @@ export function stepKMeans(
     maxShift,
   };
 }
+
+export function calculateInertia(
+  points: Point[],
+  centroids: Centroid[],
+): number {
+  return points.reduce((sum, point) => {
+    if (point.cluster === undefined) return sum;
+    const centroid = centroids[point.cluster];
+    const distance = euclidean(point, centroid);
+    return sum + distance * distance;
+  }, 0);
+}
+
+export function calculateDunnIndex(
+  points: Point[],
+  centroids: Centroid[],
+): number {
+  if (centroids.length < 2) return 0;
+
+  // Calculate intra-cluster distances (max distance within each cluster)
+  const intraDistances = centroids.map((_, clusterIndex) => {
+    const clusterPoints = points.filter((p) => p.cluster === clusterIndex);
+    if (clusterPoints.length < 2) return 0;
+
+    let maxDist = 0;
+    for (let i = 0; i < clusterPoints.length; i++) {
+      for (let j = i + 1; j < clusterPoints.length; j++) {
+        const dist = euclidean(clusterPoints[i], clusterPoints[j]);
+        maxDist = Math.max(maxDist, dist);
+      }
+    }
+    return maxDist;
+  });
+
+  const maxIntraDistance = Math.max(...intraDistances);
+
+  // Calculate inter-cluster distances (min distance between centroids)
+  let minInterDistance = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < centroids.length; i++) {
+    for (let j = i + 1; j < centroids.length; j++) {
+      const dist = euclidean(centroids[i], centroids[j]);
+      minInterDistance = Math.min(minInterDistance, dist);
+    }
+  }
+
+  return maxIntraDistance > 0 ? minInterDistance / maxIntraDistance : 0;
+}

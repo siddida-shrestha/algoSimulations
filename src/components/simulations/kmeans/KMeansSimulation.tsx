@@ -40,6 +40,8 @@ export function KMeansSimulation() {
     pointCount,
     speedMs,
     stepMode,
+    inertia,
+    dunnIndex,
     setK,
     setPointCount,
     setSpeedMs,
@@ -64,7 +66,7 @@ export function KMeansSimulation() {
             </div>
             <Slider
               min={2}
-              max={pointCount}
+              max={Math.min(pointCount, 50)}
               step={1}
               value={[k]}
               onValueChange={(value) => {
@@ -151,6 +153,13 @@ export function KMeansSimulation() {
               ) : (
                 <Badge variant="secondary">Running</Badge>
               )}
+            </p>
+            <p>
+              Inertia: <span className="font-medium">{inertia.toFixed(2)}</span>
+            </p>
+            <p>
+              Dunn Index:{" "}
+              <span className="font-medium">{dunnIndex.toFixed(3)}</span>
             </p>
             <p className="text-muted-foreground">
               Click once to assign points, then again to move centroids.

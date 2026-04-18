@@ -14,6 +14,8 @@ import {
   MIN_POINT_COUNT,
   assignPointsToNearestCentroid,
   buildProbabilityEntries,
+  calculateDunnIndex,
+  calculateInertia,
   centroidShift,
   createCentroidFromPoint,
   createRandomCentroids,
@@ -47,6 +49,8 @@ interface UseKMeansPlusPlusResult {
   speedMs: number;
   compareEnabled: boolean;
   autoPlay: boolean;
+  inertia: number;
+  dunnIndex: number;
   setK: (value: number) => void;
   setPointCount: (value: number) => void;
   setSpeedMs: (value: number) => void;
@@ -492,6 +496,14 @@ export function useKMeansPlusPlus({
     return () => window.clearTimeout(timeout);
   }, [autoPlay, nextStep, phase, speedMs]);
 
+  const inertia = useMemo(() => {
+    return calculateInertia(points, centroids);
+  }, [points, centroids]);
+
+  const dunnIndex = useMemo(() => {
+    return calculateDunnIndex(points, centroids);
+  }, [points, centroids]);
+
   return {
     points,
     centroids,
@@ -509,6 +521,8 @@ export function useKMeansPlusPlus({
     speedMs,
     compareEnabled,
     autoPlay,
+    inertia,
+    dunnIndex,
     setK: setKAndReset,
     setPointCount: setPointCountAndReset,
     setSpeedMs,

@@ -5,6 +5,18 @@
 [build.environment]
   NODE_VERSION = "22"
 
+# Exclude static assets from catch-all redirect
+[[redirects]]
+  from = "/favicon.svg"
+  to = "/favicon.svg"
+  status = 200
+
+[[redirects]]
+  from = "/icons.svg"
+  to = "/icons.svg"
+  status = 200
+
+# Catch-all for SPA routing
 [[redirects]]
   from = "/*"
   to = "/index.html"
