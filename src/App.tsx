@@ -12,6 +12,7 @@ import { KMeansPage } from "@/pages/simulations/kmeans";
 import { KMeansPlusPlusPage } from "@/pages/simulations/kmeans-plus-plus";
 import { KNNPage } from "@/pages/simulations/knn";
 import { WeightedKNNPage } from "@/pages/simulations/weighted-knn";
+import { AssociationAnalysisPage } from "@/pages/simulations/association-analysis";
 
 function SimulationsHome() {
   return (
@@ -86,6 +87,21 @@ function SimulationsHome() {
             </Link>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Association Analysis</CardTitle>
+            <CardDescription>
+              Explore support, confidence, and lift for item combinations using
+              alphabet-based transaction datasets.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link to="/simulations/association-analysis">
+              <Button>Open Simulation</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </section>
     </main>
   );
@@ -102,6 +118,10 @@ function App() {
       />
       <Route path="/simulations/knn" element={<KNNPage />} />
       <Route path="/simulations/weighted-knn" element={<WeightedKNNPage />} />
+      <Route
+        path="/simulations/association-analysis"
+        element={<AssociationAnalysisPage />}
+      />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );
