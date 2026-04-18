@@ -10,16 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-
 import type {
   Centroid,
   Point,
@@ -29,7 +21,27 @@ import type {
 import { MAX_POINT_COUNT, MIN_POINT_COUNT, pointLabel } from "./utils";
 import { useKMeansPlusPlus } from "./useKMeansPlusPlus";
 
-const CLUSTER_COLORS = ["#0ea5e9", "#f97316", "#10b981", "#e11d48", "#a855f7"];
+const CLUSTER_COLORS = [
+  "#1f77b4",
+  "#ff7f0e",
+  "#2ca02c",
+  "#d62728",
+  "#9467bd",
+  "#8c564b",
+  "#e377c2",
+  "#7f7f7f",
+  "#bcbd22",
+  "#17becf",
+];
+const HIGH_PROBABILITY_COLOR = "#3b82f6";
+const LOW_PROBABILITY_COLOR = "#eab308";
+
+function getClusterColor(index: number) {
+  return (
+    CLUSTER_COLORS[index] ??
+    `hsl(${(index * 137.508) % 360} 82% ${index % 2 === 0 ? 55 : 48}%)`
+  );
+}
 
 function mapProbability(
   entries: ProbabilityEntry[],
@@ -44,6 +56,8 @@ interface ScatterCanvasProps {
   phase: SimulationPhase;
   probabilityEntries?: ProbabilityEntry[];
   latestSelectedPointIndex?: number;
+  highlightedPointIndices?: number[];
+  highlightedPointColorByIndex?: Map<number, string>;
 }
 
 function ScatterCanvas({
@@ -53,10 +67,16 @@ function ScatterCanvas({
   phase,
   probabilityEntries = [],
   latestSelectedPointIndex,
+  highlightedPointIndices = [],
+  highlightedPointColorByIndex = new Map(),
 }: ScatterCanvasProps) {
   const probabilityMap = useMemo(
     () => mapProbability(probabilityEntries),
     [probabilityEntries],
+  );
+  const highlightedPointIndexSet = useMemo(
+    () => new Set(highlightedPointIndices),
+    [highlightedPointIndices],
   );
 
   return (
@@ -69,14 +89,14 @@ function ScatterCanvas({
       <div className="rounded-xl border border-border bg-background p-2">
         <svg
           viewBox="0 0 100 100"
-          className="aspect-square w-full rounded-lg bg-muted/30"
+          className="mx-auto aspect-square w-full max-w-140 rounded-lg bg-muted/30"
         >
           {(phase === "clustering" || phase === "converged") &&
             points
               .filter((point) => point.cluster !== undefined)
               .map((point, pointIndex) => {
                 const centroid = centroids[point.cluster ?? 0];
-                const color = CLUSTER_COLORS[point.cluster ?? 0] ?? "#64748b";
+                const color = getClusterColor(point.cluster ?? 0);
 
                 return (
                   <line
@@ -99,9 +119,12 @@ function ScatterCanvas({
               ? probabilityEntry.probability
               : 0;
             const isLatestSelected = latestSelectedPointIndex === pointIndex;
+            const isHighlighted = highlightedPointIndexSet.has(pointIndex);
+            const highlightColor =
+              highlightedPointColorByIndex.get(pointIndex) ?? "#f59e0b";
             const clusterColor =
               point.cluster !== undefined
-                ? CLUSTER_COLORS[point.cluster]
+                ? getClusterColor(point.cluster)
                 : undefined;
             const fillColor = isLatestSelected
               ? "#f43f5e"
@@ -109,33 +132,48 @@ function ScatterCanvas({
 
             const radius =
               phase === "initializing" && probabilityEntry
-                ? Math.min(2.1, 0.9 + probabilityBoost * 12)
-                : 1.1;
+                ? Math.min(1.3, 0.55 + probabilityBoost * 4.5)
+                : 0.55;
             const opacity =
               phase === "initializing" && probabilityEntry
                 ? Math.min(1, 0.28 + probabilityBoost * 3.8)
                 : 0.9;
 
             return (
-              <circle
-                key={`point-${title}-${pointIndex}`}
-                cx={point.x}
-                cy={point.y}
-                r={radius}
-                fill={fillColor}
-                fillOpacity={opacity}
-                stroke={isLatestSelected ? "white" : "none"}
-                strokeWidth={isLatestSelected ? 0.25 : 0}
-                style={{
-                  transition:
-                    "fill 300ms ease, fill-opacity 300ms ease, r 300ms ease, cx 360ms ease, cy 360ms ease",
-                }}
-              />
+              <g key={`point-${title}-${pointIndex}`}>
+                {isHighlighted && (
+                  <circle
+                    cx={point.x}
+                    cy={point.y}
+                    r={radius + 0.42}
+                    fill="none"
+                    stroke={highlightColor}
+                    strokeOpacity={0.92}
+                    strokeWidth={0.22}
+                    style={{
+                      transition: "r 300ms ease, cx 360ms ease, cy 360ms ease",
+                    }}
+                  />
+                )}
+                <circle
+                  cx={point.x}
+                  cy={point.y}
+                  r={radius}
+                  fill={fillColor}
+                  fillOpacity={opacity}
+                  stroke={isLatestSelected ? "white" : "none"}
+                  strokeWidth={isLatestSelected ? 0.25 : 0}
+                  style={{
+                    transition:
+                      "fill 300ms ease, fill-opacity 300ms ease, r 300ms ease, cx 360ms ease, cy 360ms ease",
+                  }}
+                />
+              </g>
             );
           })}
 
           {centroids.map((centroid, index) => {
-            const color = CLUSTER_COLORS[index] ?? "#334155";
+            const color = getClusterColor(index);
             const isLatest =
               centroid.sourcePointIndex === latestSelectedPointIndex;
 
@@ -184,8 +222,10 @@ export function KMeansPlusPlusSimulation() {
     randomRun,
     phase,
     initializationStep,
+    clusterStep,
     probabilityEntries,
     topProbabilityEntries,
+    lowestProbabilityEntries,
     latestSelectedPointIndex,
     logs,
     clusterIteration,
@@ -205,30 +245,61 @@ export function KMeansPlusPlusSimulation() {
   } = useKMeansPlusPlus();
 
   const plusPlusConverged = phase === "converged";
+  const topProbabilityPointIndices = useMemo(
+    () => topProbabilityEntries.map((entry) => entry.pointIndex),
+    [topProbabilityEntries],
+  );
+  const lowestProbabilityPointIndices = useMemo(
+    () => lowestProbabilityEntries.map((entry) => entry.pointIndex),
+    [lowestProbabilityEntries],
+  );
+  const highlightActive = phase === "initializing";
+  const highlightedPointIndices = useMemo(
+    () =>
+      highlightActive
+        ? [...topProbabilityPointIndices, ...lowestProbabilityPointIndices]
+        : [],
+    [
+      highlightActive,
+      lowestProbabilityPointIndices,
+      topProbabilityPointIndices,
+    ],
+  );
+  const highlightedPointColorByIndex = useMemo(() => {
+    const colorMap = new Map<number, string>();
+
+    topProbabilityEntries.forEach((entry) => {
+      colorMap.set(entry.pointIndex, HIGH_PROBABILITY_COLOR);
+    });
+
+    lowestProbabilityEntries.forEach((entry) => {
+      colorMap.set(entry.pointIndex, LOW_PROBABILITY_COLOR);
+    });
+
+    return colorMap;
+  }, [topProbabilityEntries]);
 
   return (
     <SimulationLayout
       title="K-Means++ Seeding + K-Means Clustering"
-      description="Walk through D(x)^2-weighted centroid seeding step-by-step, then continue with standard K-Means and compare against random initialization on the same dataset."
       controls={
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm font-medium">Clusters (k)</p>
-            <Select
-              value={String(k)}
-              onValueChange={(value) => setK(Number(value))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select k" />
-              </SelectTrigger>
-              <SelectContent>
-                {[2, 3, 4, 5].map((option) => (
-                  <SelectItem key={option} value={String(option)}>
-                    {option} clusters
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Clusters (k)</p>
+              <Badge variant="outline">{k}</Badge>
+            </div>
+            <Slider
+              min={2}
+              max={20}
+              step={1}
+              value={[k]}
+              onValueChange={(value) => {
+                const nextValue = Array.isArray(value) ? value[0] : value;
+                setK(nextValue ?? k);
+              }}
+              aria-label="Number of clusters"
+            />
           </div>
 
           <div className="space-y-2">
@@ -299,6 +370,16 @@ export function KMeansPlusPlusSimulation() {
             <p>
               Phase: <span className="font-medium capitalize">{phase}</span>
             </p>
+            {phase === "clustering" && (
+              <p>
+                Next step:{" "}
+                <span className="font-medium capitalize">
+                  {clusterStep === "assign"
+                    ? "assign points"
+                    : "move centroids"}
+                </span>
+              </p>
+            )}
             <p>
               Init step:{" "}
               <span className="font-medium">{initializationStep}</span>
@@ -348,6 +429,8 @@ export function KMeansPlusPlusSimulation() {
                     phase={phase}
                     probabilityEntries={probabilityEntries}
                     latestSelectedPointIndex={latestSelectedPointIndex}
+                    highlightedPointIndices={highlightedPointIndices}
+                    highlightedPointColorByIndex={highlightedPointColorByIndex}
                   />
                 </div>
               </TabsContent>
@@ -360,6 +443,8 @@ export function KMeansPlusPlusSimulation() {
                   phase={phase}
                   probabilityEntries={probabilityEntries}
                   latestSelectedPointIndex={latestSelectedPointIndex}
+                  highlightedPointIndices={highlightedPointIndices}
+                  highlightedPointColorByIndex={highlightedPointColorByIndex}
                 />
               </TabsContent>
             </Tabs>
@@ -371,20 +456,44 @@ export function KMeansPlusPlusSimulation() {
               phase={phase}
               probabilityEntries={probabilityEntries}
               latestSelectedPointIndex={latestSelectedPointIndex}
+              highlightedPointIndices={highlightedPointIndices}
+              highlightedPointColorByIndex={highlightedPointColorByIndex}
             />
           )}
 
           <div className="rounded-lg border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
             Probability weighting during initialization: P(x) = D(x)^2 / Σ
-            D(x)^2
+            D(x)^2. The higher 50% of probabilities are outlined in blue and the
+            lower 50% are outlined in yellow. Highlights disappear when
+            clustering starts.
           </div>
         </div>
       }
       logs={
         <div className="space-y-3">
-          <Card size="sm">
+          <Card size="sm" className="border-y">
             <CardHeader>
-              <CardTitle>Top 10 Probability Points</CardTitle>
+              <CardTitle>Step / Iteration Logs</CardTitle>
+              <CardDescription>
+                Initialization decisions and centroid movement summaries.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="max-h-64 space-y-2 overflow-auto text-xs">
+              {logs.slice(0, 18).map((log) => (
+                <div
+                  key={log.id}
+                  className="rounded-md border border-border/70 bg-background/80 p-2"
+                >
+                  <p className="font-medium">{log.title}</p>
+                  <p>{log.detail}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
+
+          <Card size="sm" className="border-y">
+            <CardHeader>
+              <CardTitle>Higher Probability Half</CardTitle>
               <CardDescription>
                 D(x), per-centroid distances, and weighted selection
                 probabilities.
@@ -397,14 +506,90 @@ export function KMeansPlusPlusSimulation() {
                   table.
                 </p>
               ) : (
-                topProbabilityEntries.map((entry) => (
+                topProbabilityEntries.map((entry, rank) => {
+                  const color =
+                    rank < Math.ceil(topProbabilityEntries.length / 2)
+                      ? HIGH_PROBABILITY_COLOR
+                      : LOW_PROBABILITY_COLOR;
+
+                  return (
+                    <div
+                      key={`prob-${entry.pointIndex}`}
+                      className="rounded-md border bg-background/80 p-2"
+                      style={{
+                        borderColor: color,
+                      }}
+                    >
+                      <p className="flex items-center gap-2 font-medium">
+                        <span
+                          className="inline-block size-2 rounded-full"
+                          style={{
+                            backgroundColor: color,
+                          }}
+                        />
+                        <span>#{rank + 1}</span>
+                        <span>
+                          Point {pointLabel(entry.pointIndex)} (
+                          {entry.point.x.toFixed(1)}, {entry.point.y.toFixed(1)}
+                          )
+                        </span>
+                      </p>
+                      <p>D(x) = {entry.nearestDistance.toFixed(3)}</p>
+                      <p>D(x)^2 = {entry.dSquared.toFixed(3)}</p>
+                      <p>
+                        Distances:{" "}
+                        {entry.distancesToCentroids
+                          .map(
+                            (distance, index) =>
+                              `d(C${index + 1})=${distance.toFixed(3)}`,
+                          )
+                          .join(", ")}
+                      </p>
+                      <p className="font-medium">
+                        P(x) = {entry.probability.toFixed(4)}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </CardContent>
+          </Card>
+
+          <Card size="sm" className="border-y">
+            <CardHeader>
+              <CardTitle>Lower Probability Half</CardTitle>
+              <CardDescription>
+                Lowest non-selected probabilities in the current initialization
+                step.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="max-h-72 space-y-2 overflow-auto text-xs">
+              {lowestProbabilityEntries.length === 0 ? (
+                <p className="text-muted-foreground">
+                  Compute probabilities during initialization to populate this
+                  table.
+                </p>
+              ) : (
+                lowestProbabilityEntries.map((entry, rank) => (
                   <div
-                    key={`prob-${entry.pointIndex}`}
-                    className="rounded-md border border-border/70 bg-background/80 p-2"
+                    key={`low-prob-${entry.pointIndex}`}
+                    className="rounded-md border bg-background/80 p-2"
+                    style={{
+                      borderColor: LOW_PROBABILITY_COLOR,
+                    }}
                   >
-                    <p className="font-medium">
-                      Point {pointLabel(entry.pointIndex)} (
-                      {entry.point.x.toFixed(1)}, {entry.point.y.toFixed(1)})
+                    <p className="flex items-center gap-2 font-medium">
+                      <span
+                        className="inline-block size-2 rounded-full"
+                        style={{
+                          backgroundColor: LOW_PROBABILITY_COLOR,
+                        }}
+                      />
+                      <span>#{rank + 1}</span>
+                      <span>
+                        Point {pointLabel(entry.pointIndex)} (
+                        {entry.point.x.toFixed(1)}, {entry.point.y.toFixed(1)})
+                      </span>
                     </p>
                     <p>D(x) = {entry.nearestDistance.toFixed(3)}</p>
                     <p>D(x)^2 = {entry.dSquared.toFixed(3)}</p>
@@ -423,26 +608,6 @@ export function KMeansPlusPlusSimulation() {
                   </div>
                 ))
               )}
-            </CardContent>
-          </Card>
-
-          <Card size="sm">
-            <CardHeader>
-              <CardTitle>Step / Iteration Logs</CardTitle>
-              <CardDescription>
-                Initialization decisions and centroid movement summaries.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="max-h-64 space-y-2 overflow-auto text-xs">
-              {logs.slice(0, 18).map((log) => (
-                <div
-                  key={log.id}
-                  className="rounded-md border border-border/70 bg-background/80 p-2"
-                >
-                  <p className="font-medium">{log.title}</p>
-                  <p>{log.detail}</p>
-                </div>
-              ))}
             </CardContent>
           </Card>
         </div>

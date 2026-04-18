@@ -12,14 +12,16 @@ import {
   DEFAULT_POINT_COUNT,
   MAX_POINT_COUNT,
   MIN_POINT_COUNT,
-  MIN_CLUSTER_ITERATIONS,
+  assignPointsToNearestCentroid,
   buildProbabilityEntries,
+  centroidShift,
   createCentroidFromPoint,
   createRandomCentroids,
   generateRandomPoints,
+  clusterAssignmentsChanged,
   pointLabel,
+  recomputeCentroids,
   selectWeightedPoint,
-  stepKMeans,
 } from "./utils";
 
 interface UseKMeansPlusPlusOptions {
@@ -34,8 +36,10 @@ interface UseKMeansPlusPlusResult {
   randomRun: KMeansRunState;
   phase: SimulationPhase;
   initializationStep: InitializationStep;
+  clusterStep: "assign" | "move";
   probabilityEntries: ProbabilityEntry[];
   topProbabilityEntries: ProbabilityEntry[];
+  lowestProbabilityEntries: ProbabilityEntry[];
   latestSelectedPointIndex?: number;
   logs: IterationLog[];
   clusterIteration: number;
@@ -100,6 +104,14 @@ export function useKMeansPlusPlus({
   const [speedMs, setSpeedMs] = useState(initialSpeedMs);
   const [compareEnabled, setCompareEnabled] = useState(false);
   const [autoPlay, setAutoPlay] = useState(false);
+  const [clusterStep, setClusterStep] = useState<"assign" | "move">("assign");
+  const [lastMoveShift, setLastMoveShift] = useState(Number.POSITIVE_INFINITY);
+  const [randomRunStep, setRandomRunStep] = useState<"assign" | "move">(
+    "assign",
+  );
+  const [randomRunLastMoveShift, setRandomRunLastMoveShift] = useState(
+    Number.POSITIVE_INFINITY,
+  );
 
   const initial = useMemo(
     () => createInitialRun(normalizedInitialPointCount, initialK),
@@ -133,6 +145,10 @@ export function useKMeansPlusPlus({
     setRandomRun(next.randomRun);
     setPhase("idle");
     setInitializationStep("pick-first-centroid");
+    setClusterStep("assign");
+    setLastMoveShift(Number.POSITIVE_INFINITY);
+    setRandomRunStep("assign");
+    setRandomRunLastMoveShift(Number.POSITIVE_INFINITY);
     setProbabilityEntries([]);
     setLatestSelectedPointIndex(undefined);
     setClusterIteration(0);
@@ -155,6 +171,10 @@ export function useKMeansPlusPlus({
       setRandomRun(next.randomRun);
       setPhase("idle");
       setInitializationStep("pick-first-centroid");
+      setClusterStep("assign");
+      setLastMoveShift(Number.POSITIVE_INFINITY);
+      setRandomRunStep("assign");
+      setRandomRunLastMoveShift(Number.POSITIVE_INFINITY);
       setProbabilityEntries([]);
       setLatestSelectedPointIndex(undefined);
       setClusterIteration(0);
@@ -184,6 +204,10 @@ export function useKMeansPlusPlus({
       setRandomRun(next.randomRun);
       setPhase("idle");
       setInitializationStep("pick-first-centroid");
+      setClusterStep("assign");
+      setLastMoveShift(Number.POSITIVE_INFINITY);
+      setRandomRunStep("assign");
+      setRandomRunLastMoveShift(Number.POSITIVE_INFINITY);
       setProbabilityEntries([]);
       setLatestSelectedPointIndex(undefined);
       setClusterIteration(0);
@@ -210,6 +234,10 @@ export function useKMeansPlusPlus({
     setLatestSelectedPointIndex(firstPointIndex);
     setPhase("initializing");
     setInitializationStep("compute-probabilities");
+    setClusterStep("assign");
+    setLastMoveShift(Number.POSITIVE_INFINITY);
+    setRandomRunStep("assign");
+    setRandomRunLastMoveShift(Number.POSITIVE_INFINITY);
     setLogs((prev) => [
       makeLog(
         "Initialization Step 1",
@@ -225,10 +253,43 @@ export function useKMeansPlusPlus({
         return prev;
       }
 
-      const stepped = stepKMeans(prev, MIN_CLUSTER_ITERATIONS);
-      return stepped.next;
+      if (randomRunStep === "assign") {
+        const assigned = assignPointsToNearestCentroid(
+          prev.points,
+          prev.centroids,
+        );
+        const assignmentsChanged = clusterAssignmentsChanged(
+          prev.points,
+          assigned.points,
+        );
+        const shouldConverge =
+          !assignmentsChanged && randomRunLastMoveShift < 0.001;
+
+        setRandomRunStep("move");
+
+        return {
+          ...prev,
+          points: assigned.points,
+          converged: shouldConverge,
+        };
+      }
+
+      const nextCentroids = recomputeCentroids(prev.points, prev.centroids);
+      const movement = centroidShift(prev.centroids, nextCentroids);
+      const nextIteration = prev.iteration + 1;
+
+      setRandomRunLastMoveShift(movement);
+      setRandomRunStep("assign");
+
+      return {
+        ...prev,
+        points: prev.points,
+        centroids: nextCentroids,
+        iteration: nextIteration,
+        converged: false,
+      };
     });
-  }, []);
+  }, [randomRunLastMoveShift, randomRunStep]);
 
   const nextStep = useCallback(() => {
     if (phase === "idle") {
@@ -240,6 +301,8 @@ export function useKMeansPlusPlus({
       if (centroids.length >= k) {
         setPhase("clustering");
         setInitializationStep("complete");
+        setClusterStep("assign");
+        setLastMoveShift(Number.POSITIVE_INFINITY);
         setLogs((prev) => [
           makeLog(
             "Initialization Complete",
@@ -307,48 +370,73 @@ export function useKMeansPlusPlus({
     }
 
     if (phase === "clustering") {
-      const current: KMeansRunState = {
-        points,
-        centroids,
-        iteration: clusterIteration,
-        converged: false,
-      };
-      const stepped = stepKMeans(current, MIN_CLUSTER_ITERATIONS);
+      if (clusterStep === "assign") {
+        const assigned = assignPointsToNearestCentroid(points, centroids);
+        const assignmentsChanged = clusterAssignmentsChanged(
+          points,
+          assigned.points,
+        );
+        const shouldConverge = !assignmentsChanged && lastMoveShift < 0.001;
 
-      setPoints(stepped.next.points);
-      setCentroids(stepped.next.centroids);
-      setClusterIteration(stepped.next.iteration);
+        setPoints(assigned.points);
+        setClusterStep("move");
+
+        if (compareEnabled) {
+          stepRandomIfNeeded();
+        }
+
+        setLogs((prev) => [
+          makeLog(
+            `Assignment Step ${clusterIteration + 1}`,
+            assignmentsChanged
+              ? `Assigned points to nearest centroids. Changes detected: ${assignmentsChanged}. Click Next to move centroids.`
+              : `Assigned points to nearest centroids. No assignment changes detected. Click Next to confirm centroid update.`,
+          ),
+          ...prev,
+        ]);
+
+        if (shouldConverge) {
+          setPhase("converged");
+          setAutoPlay(false);
+          setLogs((prev) => [
+            makeLog(
+              "Converged",
+              `Assignments stabilized after centroid movement.`,
+            ),
+            ...prev,
+          ]);
+        }
+
+        return;
+      }
+
+      const nextCentroids = recomputeCentroids(points, centroids);
+      const movement = centroidShift(centroids, nextCentroids);
+      const nextIteration = clusterIteration + 1;
+
+      setCentroids(nextCentroids);
+      setClusterIteration(nextIteration);
+      setLastMoveShift(movement);
+      setClusterStep("assign");
 
       if (compareEnabled) {
         stepRandomIfNeeded();
       }
 
-      const movementSummary = stepped.next.centroids
+      const movementSummary = nextCentroids
         .map((centroid, index) => {
-          const previous = current.centroids[index] ?? centroid;
+          const previous = centroids[index] ?? centroid;
           return `C${index + 1} (${previous.x.toFixed(1)}, ${previous.y.toFixed(1)}) -> (${centroid.x.toFixed(1)}, ${centroid.y.toFixed(1)})`;
         })
         .join(" | ");
 
       setLogs((prev) => [
         makeLog(
-          `Iteration ${stepped.next.iteration}`,
-          `${movementSummary}. Assignment changes: ${stepped.changedAssignments}.`,
+          `Move Step ${nextIteration}`,
+          `${movementSummary}. Max centroid shift: ${movement.toFixed(3)}.`,
         ),
         ...prev,
       ]);
-
-      if (stepped.next.converged) {
-        setPhase("converged");
-        setAutoPlay(false);
-        setLogs((prev) => [
-          makeLog(
-            "Converged",
-            `Converged after ${stepped.next.iteration} iterations with minimum ${MIN_CLUSTER_ITERATIONS} iterations enforced.`,
-          ),
-          ...prev,
-        ]);
-      }
 
       return;
     }
@@ -358,13 +446,14 @@ export function useKMeansPlusPlus({
     }
   }, [
     centroids,
+    clusterStep,
     clusterIteration,
     compareEnabled,
     initializationStep,
     k,
+    lastMoveShift,
     phase,
     points,
-    probabilityEntries,
     startInitialization,
     stepRandomIfNeeded,
   ]);
@@ -391,9 +480,19 @@ export function useKMeansPlusPlus({
   }, [autoPlay, nextStep, phase, speedMs]);
 
   const topProbabilityEntries = useMemo(() => {
-    return [...probabilityEntries]
-      .sort((a, b) => b.probability - a.probability)
-      .slice(0, 10);
+    const ranked = [...probabilityEntries]
+      .filter((entry) => !entry.selectedAsCentroid)
+      .sort((a, b) => b.probability - a.probability);
+
+    return ranked.slice(0, Math.ceil(ranked.length / 2));
+  }, [probabilityEntries]);
+
+  const lowestProbabilityEntries = useMemo(() => {
+    const ranked = [...probabilityEntries]
+      .filter((entry) => !entry.selectedAsCentroid)
+      .sort((a, b) => a.probability - b.probability);
+
+    return ranked.slice(0, Math.ceil(ranked.length / 2));
   }, [probabilityEntries]);
 
   return {
@@ -402,8 +501,10 @@ export function useKMeansPlusPlus({
     randomRun,
     phase,
     initializationStep,
+    clusterStep,
     probabilityEntries,
     topProbabilityEntries,
+    lowestProbabilityEntries,
     latestSelectedPointIndex,
     logs,
     clusterIteration,

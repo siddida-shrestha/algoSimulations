@@ -68,6 +68,15 @@ export function assignPointsToNearestCentroid(
   return { points: assignedPoints, changedAssignments };
 }
 
+export function clusterAssignmentsChanged(
+  previous: Point[],
+  next: Point[],
+): boolean {
+  return next.some(
+    (point, index) => point.cluster !== previous[index]?.cluster,
+  );
+}
+
 export function recomputeCentroids(
   points: Point[],
   centroids: Centroid[],

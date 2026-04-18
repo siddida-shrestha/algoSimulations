@@ -23,5 +23,7 @@ export interface KMeansState {
   iteration: number;
   converged: boolean;
   isRunning: boolean;
+  stage: "assign" | "move";
+  lastMoveShift: number;
   history: IterationSnapshot[];
 }

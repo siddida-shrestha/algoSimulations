@@ -14,19 +14,17 @@ import { KMeansPlusPlusPage } from "@/pages/simulations/kmeans-plus-plus";
 
 function SimulationsHome() {
   return (
-    <main className="mx-auto flex min-h-svh w-full max-w-5xl flex-col gap-6 px-4 py-8 md:px-6">
-      <header className="space-y-2">
-        <Badge variant="secondary">Algorithm Lab</Badge>
-        <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-          Clustering Simulation Playground
+    <main className="min-h-screen w-full px-4 py-6 md:px-8 md:py-8">
+      <header className="space-y-3">
+        <h1 className="text-xl font-semibold tracking-tight md:text-2xl">
+          AlgoSimulation{" "}
         </h1>
-        <p className="max-w-3xl text-muted-foreground">
-          Explore interactive clustering visualizations with reusable structure
-          for future algorithms like KNN, DBSCAN, and more.
+        <p className="max-w-4xl text-muted-foreground md:text-base">
+          Select the algo you want to explore.
         </p>
       </header>
 
-      <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <section className="mt-6 grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>K-Means Clustering</CardTitle>

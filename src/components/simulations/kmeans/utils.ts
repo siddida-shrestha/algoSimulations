@@ -3,7 +3,7 @@ import type { Centroid, Point } from "./types";
 export const MIN_COORD = 8;
 export const MAX_COORD = 92;
 export const MIN_POINT_COUNT = 150;
-export const MAX_POINT_COUNT = 500;
+export const MAX_POINT_COUNT = 1000;
 export const DEFAULT_POINT_COUNT = 300;
 
 export function randomInRange(min: number, max: number): number {

@@ -7,20 +7,31 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Slider } from "@/components/ui/slider";
 import { SimulationLayout } from "@/components/simulations/SimulationLayout";
 
 import { useKMeans } from "./useKMeans";
 import { MAX_POINT_COUNT, MIN_POINT_COUNT } from "./utils";
 
-const CLUSTER_COLORS = ["#0ea5e9", "#f97316", "#10b981", "#e11d48", "#a855f7"];
+const CLUSTER_COLORS = [
+  "#1f77b4",
+  "#ff7f0e",
+  "#2ca02c",
+  "#d62728",
+  "#9467bd",
+  "#8c564b",
+  "#e377c2",
+  "#7f7f7f",
+  "#bcbd22",
+  "#17becf",
+];
+
+function getClusterColor(index: number) {
+  return (
+    CLUSTER_COLORS[index] ??
+    `hsl(${(index * 137.508) % 360} 82% ${index % 2 === 0 ? 55 : 48}%)`
+  );
+}
 
 export function KMeansSimulation() {
   const {
@@ -28,6 +39,7 @@ export function KMeansSimulation() {
     k,
     pointCount,
     speedMs,
+    stepMode,
     setK,
     setPointCount,
     setSpeedMs,
@@ -43,26 +55,24 @@ export function KMeansSimulation() {
   return (
     <SimulationLayout
       title="K-Means Clustering"
-      description="Interactive K-Means clustering with adjustable dataset size, step execution, and centroid movement tracking."
       controls={
         <div className="space-y-4">
           <div className="space-y-2">
-            <p className="text-sm font-medium">Clusters (k)</p>
-            <Select
-              value={String(k)}
-              onValueChange={(value) => setK(Number(value))}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select k" />
-              </SelectTrigger>
-              <SelectContent>
-                {[2, 3, 4, 5].map((option) => (
-                  <SelectItem key={option} value={String(option)}>
-                    {option} clusters
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex items-center justify-between gap-2">
+              <p className="text-sm font-medium">Clusters (k)</p>
+              <Badge variant="outline">{k}</Badge>
+            </div>
+            <Slider
+              min={2}
+              max={20}
+              step={1}
+              value={[k]}
+              onValueChange={(value) => {
+                const nextValue = Array.isArray(value) ? value[0] : value;
+                setK(nextValue ?? k);
+              }}
+              aria-label="Number of clusters"
+            />
           </div>
 
           <div className="space-y-2">
@@ -129,6 +139,12 @@ export function KMeansSimulation() {
               Iteration: <span className="font-medium">{state.iteration}</span>
             </p>
             <p>
+              Next step:{" "}
+              <span className="font-medium capitalize">
+                {stepMode === "assign" ? "assign points" : "move centroids"}
+              </span>
+            </p>
+            <p>
               Status:{" "}
               {state.converged ? (
                 <Badge>Converged</Badge>
@@ -137,7 +153,7 @@ export function KMeansSimulation() {
               )}
             </p>
             <p className="text-muted-foreground">
-              Converges when assignments stabilize.
+              Click once to assign points, then again to move centroids.
             </p>
           </div>
         </div>
@@ -147,7 +163,7 @@ export function KMeansSimulation() {
           <div className="rounded-xl border border-border bg-background p-2">
             <svg
               viewBox="0 0 100 100"
-              className="aspect-square w-full overflow-visible rounded-lg bg-muted/30"
+              className="mx-auto aspect-square w-full max-w-140 overflow-visible rounded-lg bg-muted/30"
             >
               {state.points
                 .filter((point) => point.cluster !== undefined)
@@ -160,16 +176,16 @@ export function KMeansSimulation() {
                       y1={point.y}
                       x2={centroid?.x}
                       y2={centroid?.y}
-                      stroke={CLUSTER_COLORS[point.cluster ?? 0]}
-                      strokeOpacity={0.25}
-                      strokeWidth={0.4}
+                      stroke={getClusterColor(point.cluster ?? 0)}
+                      strokeOpacity={0.5}
+                      strokeWidth={0.5}
                       style={{ transition: "all 420ms ease" }}
                     />
                   );
                 })}
 
               {state.points.map((point) => {
-                const color = CLUSTER_COLORS[point.cluster ?? 0] ?? "#64748b";
+                const color = getClusterColor(point.cluster ?? 0);
                 return (
                   <circle
                     key={point.id}
@@ -187,7 +203,7 @@ export function KMeansSimulation() {
               })}
 
               {state.centroids.map((centroid, index) => {
-                const color = CLUSTER_COLORS[index];
+                const color = getClusterColor(index);
                 return (
                   <g
                     key={centroid.id}
@@ -232,7 +248,7 @@ export function KMeansSimulation() {
               >
                 <span
                   className="size-2.5 rounded-full"
-                  style={{ backgroundColor: CLUSTER_COLORS[index] }}
+                  style={{ backgroundColor: getClusterColor(index) }}
                   aria-hidden="true"
                 />
                 <span>{label}</span>
@@ -243,7 +259,7 @@ export function KMeansSimulation() {
       }
       logs={
         <div className="space-y-3">
-          <Card size="sm">
+          <Card size="sm" className="border-y">
             <CardHeader>
               <CardTitle>Current Iteration</CardTitle>
               <CardDescription>Iteration {latestLog.iteration}</CardDescription>
@@ -258,7 +274,7 @@ export function KMeansSimulation() {
             </CardContent>
           </Card>
 
-          <Card size="sm">
+          <Card size="sm" className="border-y">
             <CardHeader>
               <CardTitle>Cluster Summary</CardTitle>
               <CardDescription>Points assigned this iteration</CardDescription>

@@ -26,6 +26,7 @@ interface UseKMeansResult {
   k: number;
   pointCount: number;
   speedMs: number;
+  stepMode: "assign" | "move";
   setK: (nextK: number) => void;
   setPointCount: (nextPointCount: number) => void;
   setSpeedMs: (nextSpeedMs: number) => void;
@@ -51,6 +52,8 @@ export function useKMeans({
   const [k, setK] = useState(initialK);
   const [pointCount, setPointCount] = useState(normalizedInitialPointCount);
   const [speedMs, setSpeedMs] = useState(initialSpeedMs);
+  const [stepMode, setStepMode] = useState<"assign" | "move">("assign");
+  const [lastMoveShift, setLastMoveShift] = useState(Number.POSITIVE_INFINITY);
 
   const createInitialState = useCallback(
     (targetK: number, targetPointCount: number): KMeansState => {
@@ -63,6 +66,8 @@ export function useKMeans({
         iteration: 0,
         converged: false,
         isRunning: false,
+        stage: "assign",
+        lastMoveShift: Number.POSITIVE_INFINITY,
         history: [
           {
             iteration: 0,
@@ -85,24 +90,36 @@ export function useKMeans({
         return { ...prevState, isRunning: false };
       }
 
-      const assignedPoints = assignPointsToCentroids(
-        prevState.points,
-        prevState.centroids,
-      );
+      if (stepMode === "assign") {
+        const assignedPoints = assignPointsToCentroids(
+          prevState.points,
+          prevState.centroids,
+        );
+        const assignmentsChanged = clusterAssignmentsChanged(
+          prevState.points,
+          assignedPoints,
+        );
+        const shouldConverge =
+          !assignmentsChanged && lastMoveShift < CONVERGENCE_THRESHOLD;
+
+        setStepMode("move");
+
+        return {
+          ...prevState,
+          points: assignedPoints,
+          converged: shouldConverge,
+          isRunning: shouldConverge ? false : prevState.isRunning,
+          stage: "move",
+        };
+      }
+
       const nextCentroids = recomputeCentroids(
-        assignedPoints,
+        prevState.points,
         prevState.centroids,
       );
       const movement = maxCentroidShift(prevState.centroids, nextCentroids);
-      const assignmentsChanged = clusterAssignmentsChanged(
-        prevState.points,
-        assignedPoints,
-      );
       const nextIteration = prevState.iteration + 1;
-      const clusterCounts = getClusterCounts(assignedPoints, k);
-
-      const shouldConverge =
-        !assignmentsChanged || movement < CONVERGENCE_THRESHOLD;
+      const clusterCounts = getClusterCounts(prevState.points, k);
 
       const snapshot: IterationSnapshot = {
         iteration: nextIteration,
@@ -110,17 +127,21 @@ export function useKMeans({
         clusterCounts,
       };
 
+      setLastMoveShift(movement);
+      setStepMode("assign");
+
       return {
         ...prevState,
-        points: assignedPoints,
         centroids: nextCentroids,
         iteration: nextIteration,
-        converged: shouldConverge,
-        isRunning: shouldConverge ? false : prevState.isRunning,
+        converged: false,
+        isRunning: prevState.isRunning,
+        lastMoveShift: movement,
+        stage: "assign",
         history: [...prevState.history, snapshot],
       };
     });
-  }, [k]);
+  }, [k, lastMoveShift, stepMode]);
 
   const start = useCallback(() => {
     setState((prevState) => ({ ...prevState, isRunning: true }));
@@ -132,6 +153,8 @@ export function useKMeans({
 
   const reset = useCallback(
     (nextK = k, nextPointCount = pointCount) => {
+      setStepMode("assign");
+      setLastMoveShift(Number.POSITIVE_INFINITY);
       setState(createInitialState(nextK, nextPointCount));
     },
     [createInitialState, k, pointCount],
@@ -158,6 +181,8 @@ export function useKMeans({
   const updateK = useCallback(
     (nextK: number) => {
       setK(nextK);
+      setStepMode("assign");
+      setLastMoveShift(Number.POSITIVE_INFINITY);
       setState(createInitialState(nextK, pointCount));
     },
     [createInitialState, pointCount],
@@ -171,6 +196,8 @@ export function useKMeans({
       );
 
       setPointCount(boundedPointCount);
+      setStepMode("assign");
+      setLastMoveShift(Number.POSITIVE_INFINITY);
       setState(createInitialState(k, boundedPointCount));
     },
     [createInitialState, k],
@@ -181,6 +208,7 @@ export function useKMeans({
     k,
     pointCount,
     speedMs,
+    stepMode,
     setK: updateK,
     setPointCount: updatePointCount,
     setSpeedMs,
