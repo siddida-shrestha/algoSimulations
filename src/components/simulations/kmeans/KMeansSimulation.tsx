@@ -64,7 +64,7 @@ export function KMeansSimulation() {
             </div>
             <Slider
               min={2}
-              max={20}
+              max={pointCount}
               step={1}
               value={[k]}
               onValueChange={(value) => {

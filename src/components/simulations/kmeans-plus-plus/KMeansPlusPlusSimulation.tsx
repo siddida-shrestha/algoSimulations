@@ -34,7 +34,6 @@ const CLUSTER_COLORS = [
   "#17becf",
 ];
 const HIGH_PROBABILITY_COLOR = "#3b82f6";
-const LOW_PROBABILITY_COLOR = "#eab308";
 
 function getClusterColor(index: number) {
   return (
@@ -68,7 +67,6 @@ function ScatterCanvas({
   probabilityEntries = [],
   latestSelectedPointIndex,
   highlightedPointIndices = [],
-  highlightedPointColorByIndex = new Map(),
 }: ScatterCanvasProps) {
   const probabilityMap = useMemo(
     () => mapProbability(probabilityEntries),
@@ -120,8 +118,6 @@ function ScatterCanvas({
               : 0;
             const isLatestSelected = latestSelectedPointIndex === pointIndex;
             const isHighlighted = highlightedPointIndexSet.has(pointIndex);
-            const highlightColor =
-              highlightedPointColorByIndex.get(pointIndex) ?? "#f59e0b";
             const clusterColor =
               point.cluster !== undefined
                 ? getClusterColor(point.cluster)
@@ -139,26 +135,14 @@ function ScatterCanvas({
                 ? Math.min(1, 0.28 + probabilityBoost * 3.8)
                 : 0.9;
 
+            const effectiveRadius = isHighlighted ? radius * 1.15 : radius;
+
             return (
               <g key={`point-${title}-${pointIndex}`}>
-                {isHighlighted && (
-                  <circle
-                    cx={point.x}
-                    cy={point.y}
-                    r={radius + 0.42}
-                    fill="none"
-                    stroke={highlightColor}
-                    strokeOpacity={0.92}
-                    strokeWidth={0.22}
-                    style={{
-                      transition: "r 300ms ease, cx 360ms ease, cy 360ms ease",
-                    }}
-                  />
-                )}
                 <circle
                   cx={point.x}
                   cy={point.y}
-                  r={radius}
+                  r={effectiveRadius}
                   fill={fillColor}
                   fillOpacity={opacity}
                   stroke={isLatestSelected ? "white" : "none"}
@@ -224,9 +208,8 @@ export function KMeansPlusPlusSimulation() {
     initializationStep,
     clusterStep,
     probabilityEntries,
-    topProbabilityEntries,
-    lowestProbabilityEntries,
     latestSelectedPointIndex,
+    selectionRoll,
     logs,
     clusterIteration,
     k,
@@ -245,39 +228,36 @@ export function KMeansPlusPlusSimulation() {
   } = useKMeansPlusPlus();
 
   const plusPlusConverged = phase === "converged";
-  const topProbabilityPointIndices = useMemo(
-    () => topProbabilityEntries.map((entry) => entry.pointIndex),
-    [topProbabilityEntries],
-  );
-  const lowestProbabilityPointIndices = useMemo(
-    () => lowestProbabilityEntries.map((entry) => entry.pointIndex),
-    [lowestProbabilityEntries],
-  );
   const highlightActive = phase === "initializing";
+  const sortedProbabilityEntries = useMemo(
+    () => [...probabilityEntries].sort((a, b) => b.probability - a.probability),
+    [probabilityEntries],
+  );
+
   const highlightedPointIndices = useMemo(
     () =>
       highlightActive
-        ? [...topProbabilityPointIndices, ...lowestProbabilityPointIndices]
+        ? sortedProbabilityEntries.map((entry) => entry.pointIndex)
         : [],
-    [
-      highlightActive,
-      lowestProbabilityPointIndices,
-      topProbabilityPointIndices,
-    ],
+    [highlightActive, sortedProbabilityEntries],
   );
   const highlightedPointColorByIndex = useMemo(() => {
     const colorMap = new Map<number, string>();
+    const midpoint = Math.ceil(sortedProbabilityEntries.length / 2);
 
-    topProbabilityEntries.forEach((entry) => {
+    const topHalf = sortedProbabilityEntries.slice(0, midpoint);
+    const bottomHalf = sortedProbabilityEntries.slice(midpoint);
+
+    topHalf.forEach((entry) => {
       colorMap.set(entry.pointIndex, HIGH_PROBABILITY_COLOR);
     });
 
-    lowestProbabilityEntries.forEach((entry) => {
-      colorMap.set(entry.pointIndex, LOW_PROBABILITY_COLOR);
+    bottomHalf.forEach((entry) => {
+      colorMap.set(entry.pointIndex, "#eab308");
     });
 
     return colorMap;
-  }, [topProbabilityEntries]);
+  }, [probabilityEntries]);
 
   return (
     <SimulationLayout
@@ -463,9 +443,9 @@ export function KMeansPlusPlusSimulation() {
 
           <div className="rounded-lg border border-border bg-muted/30 p-2 text-xs text-muted-foreground">
             Probability weighting during initialization: P(x) = D(x)^2 / Σ
-            D(x)^2. The higher 50% of probabilities are outlined in blue and the
-            lower 50% are outlined in yellow. Highlights disappear when
-            clustering starts.
+            D(x)^2. Points are sorted by probability with cumulative values
+            shown. The selection roll determines which point is chosen based on
+            cumulative probability ranges.
           </div>
         </div>
       }
@@ -493,120 +473,86 @@ export function KMeansPlusPlusSimulation() {
 
           <Card size="sm" className="border-y">
             <CardHeader>
-              <CardTitle>Higher Probability Half</CardTitle>
+              <CardTitle>Probability Distribution</CardTitle>
               <CardDescription>
-                D(x), per-centroid distances, and weighted selection
-                probabilities.
+                D(x)^2 values, probabilities, and cumulative probabilities for
+                weighted selection.
+                {selectionRoll !== undefined && (
+                  <span className="block font-medium text-foreground">
+                    Selection roll: {selectionRoll.toFixed(3)}
+                  </span>
+                )}
               </CardDescription>
             </CardHeader>
-            <CardContent className="max-h-72 space-y-2 overflow-auto text-xs">
-              {topProbabilityEntries.length === 0 ? (
-                <p className="text-muted-foreground">
+            <CardContent className="max-h-96 overflow-auto">
+              {probabilityEntries.length === 0 ? (
+                <p className="text-xs text-muted-foreground">
                   Compute probabilities during initialization to populate this
                   table.
                 </p>
               ) : (
-                topProbabilityEntries.map((entry, rank) => {
-                  const color =
-                    rank < Math.ceil(topProbabilityEntries.length / 2)
-                      ? HIGH_PROBABILITY_COLOR
-                      : LOW_PROBABILITY_COLOR;
-
-                  return (
-                    <div
-                      key={`prob-${entry.pointIndex}`}
-                      className="rounded-md border bg-background/80 p-2"
-                      style={{
-                        borderColor: color,
-                      }}
-                    >
-                      <p className="flex items-center gap-2 font-medium">
-                        <span
-                          className="inline-block size-2 rounded-full"
-                          style={{
-                            backgroundColor: color,
-                          }}
-                        />
-                        <span>#{rank + 1}</span>
-                        <span>
-                          Point {pointLabel(entry.pointIndex)} (
-                          {entry.point.x.toFixed(1)}, {entry.point.y.toFixed(1)}
-                          )
-                        </span>
-                      </p>
-                      <p>D(x) = {entry.nearestDistance.toFixed(3)}</p>
-                      <p>D(x)^2 = {entry.dSquared.toFixed(3)}</p>
-                      <p>
-                        Distances:{" "}
-                        {entry.distancesToCentroids
-                          .map(
-                            (distance, index) =>
-                              `d(C${index + 1})=${distance.toFixed(3)}`,
-                          )
-                          .join(", ")}
-                      </p>
-                      <p className="font-medium">
-                        P(x) = {entry.probability.toFixed(4)}
-                      </p>
+                <div className="overflow-x-auto">
+                  <div className="min-w-[700px] space-y-1">
+                    <div className="grid grid-cols-6 gap-2 text-xs font-medium text-muted-foreground border-b border-border pb-1">
+                      <div>Point</div>
+                      <div>D(x)</div>
+                      <div>D(x)²</div>
+                      <div>P(x)</div>
+                      <div>Cumulative</div>
+                      <div>Roll Range</div>
                     </div>
-                  );
-                })
-              )}
-            </CardContent>
-          </Card>
+                    {sortedProbabilityEntries.map((entry, index) => {
+                      const prevCumulative =
+                        index === 0
+                          ? 0
+                          : sortedProbabilityEntries
+                              .slice(0, index)
+                              .reduce((sum, e) => sum + e.probability, 0);
 
-          <Card size="sm" className="border-y">
-            <CardHeader>
-              <CardTitle>Lower Probability Half</CardTitle>
-              <CardDescription>
-                Lowest non-selected probabilities in the current initialization
-                step.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="max-h-72 space-y-2 overflow-auto text-xs">
-              {lowestProbabilityEntries.length === 0 ? (
-                <p className="text-muted-foreground">
-                  Compute probabilities during initialization to populate this
-                  table.
-                </p>
-              ) : (
-                lowestProbabilityEntries.map((entry, rank) => (
-                  <div
-                    key={`low-prob-${entry.pointIndex}`}
-                    className="rounded-md border bg-background/80 p-2"
-                    style={{
-                      borderColor: LOW_PROBABILITY_COLOR,
-                    }}
-                  >
-                    <p className="flex items-center gap-2 font-medium">
-                      <span
-                        className="inline-block size-2 rounded-full"
-                        style={{
-                          backgroundColor: LOW_PROBABILITY_COLOR,
-                        }}
-                      />
-                      <span>#{rank + 1}</span>
-                      <span>
-                        Point {pointLabel(entry.pointIndex)} (
-                        {entry.point.x.toFixed(1)}, {entry.point.y.toFixed(1)})
-                      </span>
-                    </p>
-                    <p>D(x) = {entry.nearestDistance.toFixed(3)}</p>
-                    <p>D(x)^2 = {entry.dSquared.toFixed(3)}</p>
-                    <p>
-                      Distances:{" "}
-                      {entry.distancesToCentroids
-                        .map(
-                          (distance, index) =>
-                            `d(C${index + 1})=${distance.toFixed(3)}`,
-                        )
-                        .join(", ")}
-                    </p>
-                    <p className="font-medium">
-                      P(x) = {entry.probability.toFixed(4)}
-                    </p>
+                      const isSelected =
+                        latestSelectedPointIndex === entry.pointIndex;
+                      const isInRollRange =
+                        selectionRoll !== undefined &&
+                        entry.cumulativeProbability !== undefined &&
+                        selectionRoll >= prevCumulative &&
+                        selectionRoll < entry.cumulativeProbability;
+
+                      return (
+                        <div
+                          key={`prob-${entry.pointIndex}`}
+                          className={`grid grid-cols-6 gap-2 text-xs p-1 rounded ${
+                            isSelected
+                              ? "bg-red-50 border border-red-200"
+                              : isInRollRange
+                                ? "bg-blue-50 border border-blue-200"
+                                : "bg-background/80"
+                          }`}
+                        >
+                          <div className="font-medium">
+                            {pointLabel(entry.pointIndex)}
+                            {isSelected && (
+                              <span className="ml-1 text-red-600">✓</span>
+                            )}
+                          </div>
+                          <div>{entry.nearestDistance.toFixed(3)}</div>
+                          <div>{entry.dSquared.toFixed(3)}</div>
+                          <div className="font-medium">
+                            {entry.probability.toFixed(4)}
+                          </div>
+                          <div>
+                            {entry.cumulativeProbability?.toFixed(4) ??
+                              "0.0000"}
+                          </div>
+                          <div>
+                            [{prevCumulative.toFixed(3)},{" "}
+                            {entry.cumulativeProbability?.toFixed(3) ?? "0.000"}
+                            )
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                ))
+                </div>
               )}
             </CardContent>
           </Card>

@@ -47,7 +47,7 @@ export function SimulationLayout({
               Configure inputs and drive each step.
             </CardDescription>
           </CardHeader>
-          <CardContent className="min-h-0 space-y-4 overflow-auto">
+          <CardContent className="min-h-0 space-y-4 overflow-visible">
             {controls}
           </CardContent>
         </Card>

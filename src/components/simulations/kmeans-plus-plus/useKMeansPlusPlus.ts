@@ -38,9 +38,8 @@ interface UseKMeansPlusPlusResult {
   initializationStep: InitializationStep;
   clusterStep: "assign" | "move";
   probabilityEntries: ProbabilityEntry[];
-  topProbabilityEntries: ProbabilityEntry[];
-  lowestProbabilityEntries: ProbabilityEntry[];
   latestSelectedPointIndex?: number;
+  selectionRoll?: number;
   logs: IterationLog[];
   clusterIteration: number;
   k: number;
@@ -129,6 +128,7 @@ export function useKMeansPlusPlus({
   >([]);
   const [latestSelectedPointIndex, setLatestSelectedPointIndex] =
     useState<number>();
+  const [selectionRoll, setSelectionRoll] = useState<number>();
   const [clusterIteration, setClusterIteration] = useState(0);
   const [logs, setLogs] = useState<IterationLog[]>([
     makeLog(
@@ -151,6 +151,7 @@ export function useKMeansPlusPlus({
     setRandomRunLastMoveShift(Number.POSITIVE_INFINITY);
     setProbabilityEntries([]);
     setLatestSelectedPointIndex(undefined);
+    setSelectionRoll(undefined);
     setClusterIteration(0);
     setAutoPlay(false);
     setLogs([
@@ -177,6 +178,7 @@ export function useKMeansPlusPlus({
       setRandomRunLastMoveShift(Number.POSITIVE_INFINITY);
       setProbabilityEntries([]);
       setLatestSelectedPointIndex(undefined);
+      setSelectionRoll(undefined);
       setClusterIteration(0);
       setAutoPlay(false);
       setLogs([
@@ -210,6 +212,7 @@ export function useKMeansPlusPlus({
       setRandomRunLastMoveShift(Number.POSITIVE_INFINITY);
       setProbabilityEntries([]);
       setLatestSelectedPointIndex(undefined);
+      setSelectionRoll(undefined);
       setClusterIteration(0);
       setAutoPlay(false);
       setLogs([
@@ -315,11 +318,20 @@ export function useKMeansPlusPlus({
 
       if (initializationStep === "compute-probabilities") {
         const entries = buildProbabilityEntries(points, centroids);
-        const best = [...entries].sort(
+        const sortedEntries = [...entries].sort(
           (a, b) => b.probability - a.probability,
-        )[0];
+        );
 
-        setProbabilityEntries(entries);
+        // Calculate cumulative probabilities in display order
+        let cumulative = 0;
+        const entriesWithCumulative = sortedEntries.map((entry) => ({
+          ...entry,
+          cumulativeProbability: (cumulative += entry.probability),
+        }));
+
+        const best = entriesWithCumulative[0];
+
+        setProbabilityEntries(entriesWithCumulative);
         setInitializationStep("pick-weighted-centroid");
         setLogs((prev) => [
           makeLog(
@@ -343,6 +355,7 @@ export function useKMeansPlusPlus({
 
         setCentroids((prev) => [...prev, nextCentroid]);
         setLatestSelectedPointIndex(selection.pointIndex);
+        setSelectionRoll(selection.randomRoll);
         setInitializationStep("compute-probabilities");
         setLogs((prev) => [
           makeLog(
@@ -479,22 +492,6 @@ export function useKMeansPlusPlus({
     return () => window.clearTimeout(timeout);
   }, [autoPlay, nextStep, phase, speedMs]);
 
-  const topProbabilityEntries = useMemo(() => {
-    const ranked = [...probabilityEntries]
-      .filter((entry) => !entry.selectedAsCentroid)
-      .sort((a, b) => b.probability - a.probability);
-
-    return ranked.slice(0, Math.ceil(ranked.length / 2));
-  }, [probabilityEntries]);
-
-  const lowestProbabilityEntries = useMemo(() => {
-    const ranked = [...probabilityEntries]
-      .filter((entry) => !entry.selectedAsCentroid)
-      .sort((a, b) => a.probability - b.probability);
-
-    return ranked.slice(0, Math.ceil(ranked.length / 2));
-  }, [probabilityEntries]);
-
   return {
     points,
     centroids,
@@ -503,9 +500,8 @@ export function useKMeansPlusPlus({
     initializationStep,
     clusterStep,
     probabilityEntries,
-    topProbabilityEntries,
-    lowestProbabilityEntries,
     latestSelectedPointIndex,
+    selectionRoll,
     logs,
     clusterIteration,
     k,

@@ -30,6 +30,7 @@ export type ProbabilityEntry = {
   nearestDistance: number;
   dSquared: number;
   probability: number;
+  cumulativeProbability?: number;
   selectedAsCentroid: boolean;
 };
 

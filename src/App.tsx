@@ -10,6 +10,8 @@ import {
 } from "@/components/ui/card";
 import { KMeansPage } from "@/pages/simulations/kmeans";
 import { KMeansPlusPlusPage } from "@/pages/simulations/kmeans-plus-plus";
+import { KNNPage } from "@/pages/simulations/knn";
+import { WeightedKNNPage } from "@/pages/simulations/weighted-knn";
 
 function SimulationsHome() {
   return (
@@ -53,6 +55,37 @@ function SimulationsHome() {
             </Link>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>K-Nearest Neighbors Classification</CardTitle>
+            <CardDescription>
+              Interactive visualization of 1-NN, K-NN, and n-NN algorithms with
+              draggable query points and voting explanations.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link to="/simulations/knn">
+              <Button>Open Simulation</Button>
+            </Link>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Weighted K-Nearest Neighbors Classification</CardTitle>
+            <CardDescription>
+              Compare uniform KNN with distance-weighted variants. Demonstrates
+              why inverse distance weighting is preferred over flawed assignment
+              weighting.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link to="/simulations/weighted-knn">
+              <Button>Open Simulation</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </section>
     </main>
   );
@@ -67,6 +100,8 @@ function App() {
         path="/simulations/kmeans-plus-plus"
         element={<KMeansPlusPlusPage />}
       />
+      <Route path="/simulations/knn" element={<KNNPage />} />
+      <Route path="/simulations/weighted-knn" element={<WeightedKNNPage />} />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   );

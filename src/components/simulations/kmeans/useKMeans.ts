@@ -180,10 +180,11 @@ export function useKMeans({
 
   const updateK = useCallback(
     (nextK: number) => {
-      setK(nextK);
+      const boundedK = Math.min(nextK, pointCount);
+      setK(boundedK);
       setStepMode("assign");
       setLastMoveShift(Number.POSITIVE_INFINITY);
-      setState(createInitialState(nextK, pointCount));
+      setState(createInitialState(boundedK, pointCount));
     },
     [createInitialState, pointCount],
   );
@@ -195,10 +196,12 @@ export function useKMeans({
         Math.max(MIN_POINT_COUNT, nextPointCount),
       );
 
+      const boundedK = Math.min(k, boundedPointCount);
+      setK(boundedK);
       setPointCount(boundedPointCount);
       setStepMode("assign");
       setLastMoveShift(Number.POSITIVE_INFINITY);
-      setState(createInitialState(k, boundedPointCount));
+      setState(createInitialState(boundedK, boundedPointCount));
     },
     [createInitialState, k],
   );
