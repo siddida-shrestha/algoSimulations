@@ -329,9 +329,9 @@ export function WeightedKNNSimulation() {
             <div className="flex items-center justify-between">
               <span className="font-medium">Predicted Class:</span>
               <Badge
-                variant={
-                  prediction.predictedClass === 0 ? "default" : "secondary"
-                }
+                style={{
+                  backgroundColor: getClassColor(prediction.predictedClass),
+                }}
               >
                 Class {prediction.predictedClass}
               </Badge>

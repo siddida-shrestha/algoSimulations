@@ -13,6 +13,7 @@ import { KMeansPlusPlusPage } from "@/pages/simulations/kmeans-plus-plus";
 import { KNNPage } from "@/pages/simulations/knn";
 import { WeightedKNNPage } from "@/pages/simulations/weighted-knn";
 import { AssociationAnalysisPage } from "@/pages/simulations/association-analysis";
+import { SimpleNNPage } from "@/pages/simulations/neural-network-simple";
 
 function SimulationsHome() {
   return (
@@ -102,6 +103,22 @@ function SimulationsHome() {
             </Link>
           </CardContent>
         </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Neural Network (Forward Pass)</CardTitle>
+            <CardDescription>
+              Step-by-step visualization of single and multi-layer neural
+              networks. Understand how data flows through hidden layers with
+              different activation functions.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link to="/simulations/neural-network-simple">
+              <Button>Open Simulation</Button>
+            </Link>
+          </CardContent>
+        </Card>
       </section>
     </main>
   );
@@ -121,6 +138,10 @@ function App() {
       <Route
         path="/simulations/association-analysis"
         element={<AssociationAnalysisPage />}
+      />
+      <Route
+        path="/simulations/neural-network-simple"
+        element={<SimpleNNPage />}
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

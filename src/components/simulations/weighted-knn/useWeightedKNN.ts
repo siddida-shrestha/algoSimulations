@@ -190,20 +190,20 @@ export function useWeightedKNN(): UseWeightedKNNResult {
       contributions[neighbor.point.label] += neighbor.weight;
     });
 
-    const classContributions: ClassContribution[] = [
-      {
-        class: 0 as 0 | 1,
-        totalWeight: contributions[0],
+    const totalWeight = Object.values(contributions).reduce(
+      (sum, w) => sum + w,
+      0,
+    );
+
+    const classContributions: ClassContribution[] = Array.from(
+      { length: state.classCount },
+      (_, i) => ({
+        class: i,
+        totalWeight: contributions[i],
         percentage:
-          (contributions[0] / (contributions[0] + contributions[1])) * 100,
-      },
-      {
-        class: 1 as 0 | 1,
-        totalWeight: contributions[1],
-        percentage:
-          (contributions[1] / (contributions[0] + contributions[1])) * 100,
-      },
-    ].sort((a, b) => b.totalWeight - a.totalWeight);
+          totalWeight > 0 ? (contributions[i] / totalWeight) * 100 : 0,
+      }),
+    ).sort((a, b) => b.totalWeight - a.totalWeight);
 
     const predictedClass = classContributions[0].class;
     const confidence = classContributions[0].percentage;
@@ -213,7 +213,7 @@ export function useWeightedKNN(): UseWeightedKNNResult {
       confidence,
       contributions: classContributions,
     };
-  }, [neighbors]);
+  }, [neighbors, state.classCount]);
 
   return {
     state,

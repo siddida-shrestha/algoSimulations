@@ -34,13 +34,13 @@ export interface WeightResult {
 }
 
 export interface ClassContribution {
-  class: 0 | 1;
+  class: number;
   totalWeight: number;
   percentage: number;
 }
 
 export interface PredictionResult {
-  predictedClass: 0 | 1;
+  predictedClass: number;
   confidence: number;
   contributions: ClassContribution[];
 }
